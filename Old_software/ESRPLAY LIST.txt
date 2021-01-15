@@ -1,0 +1,532 @@
+    1 DECLARE INTEGER R[10,3000],A[2,3000],F[2,3000],Rn,N,Fr[3000],Nav
+    2 DIM Par[10,10],Scr[5]
+    3 DATA 1000,500,500,40,1
+    4 READ Scr
+    5 Nav = 20
+   10 DIM Command$(3),Name$(60),Comment$(60)
+   20 Rn = 1
+   21 CLEAR
+   23 PRINT AT 23,1:"                             "
+   25 PRINT AT 23,58:"Active register: ";Rn
+   26 PRINT AT 24,58:"Scaling factor : ";Scr[5]
+   27 PRINT AT 23,1:
+   30 INPUT PROMPT "Enter command:":Command$
+   35 HOME
+   36 FOR I = 1 TO 2
+   37   PRINT AT I,1:"                                                        "
+   38 NEXT I
+   39 HOME
+   40 IF Command$<>"Tak" THEN 610
+   45 HOME
+   50 INPUT PROMPT "Enter number of points to be taken:":N
+   55 Par[Rn,1] = N
+   56 Par[Rn,5] = 1
+   57 Par[Rn,6] = N
+   59 INIT GPIB
+   60 CLEAR GPIB
+   70 WRITE GPIB CMD(20)
+   80 WRITE GPIB CMD(Unl,Unt,Mta,38),72,49,70,EOI,CMD(Unl,Unt)
+   90 WRITE GPIB CMD(Unl,Unt,Mta,38),74,EOI,CMD(Unl,Unt)
+  100 WRITE GPIB CMD(Unl,Unt,Mla,70);
+  110 FOR I = 1 TO N
+  120   WRITE GPIB CMD(Unl,Unt,Mta,38),49,EOI,CMD(Unl,Unt)
+  130   WRITE GPIB CMD(Unl,Unt,Mla,70);
+  140   READ GPIB A2,A1
+  150   A[1,I] = A1
+  160   A[2,I] = A2
+  170   WRITE GPIB CMD(Unl,Unt,Mta,38),50,EOI,CMD(Unl,Unt)
+  180   WRITE GPIB CMD(Unl,Unt,Mla,70);
+  190   READ GPIB A2,A1
+  200   F[1,I] = A1
+  210   F[2,I] = A2
+  212   PRINT AT 1,60:"POINT NUMBER: ";I
+  220 NEXT I
+  230 CLEAR GPIB
+  240 REM TRANSFORMATION OF PRIMARY DATA INTO NUMERICAL ARRAYS
+  250 FOR I = 1 TO N
+  260   X = A[1,I]+256*A[2,I]
+  270   IF A[2,I]>4 THEN X = X-65536.0
+  280   R[Rn,I] = X
+  290   X = F[1,I]+256*F[2,I]
+  300   IF F[2,I]>4 THEN X = X-65536.0
+  310   Fr[I] = X
+  320 NEXT I
+  330 REM LOCATION OF FREMY SALT PEAK POSITIONS
+  340 S1 = 0
+  350 S2 = 0
+  360 FOR I = 1 TO 100
+  370   S1 = S1+Fr[I]
+  380   S2 = S2+Fr[I]*Fr[I]
+  390 NEXT I
+  400 Av = S1/100
+  410 Delta = SQR((S2-100*Av*Av)/100)
+  411 Thr = Av+10*Delta
+  412 CALL P_CROSS(Fr,Thr) RETURN Ic1
+  420 Thr = Av
+  430 CALL P_CROSS(Fr,Thr,1,Ic1) RETURN Ic
+  440 Par[Rn,2] = Ic
+  441 Thr = Av+10*Delta
+  442 CALL P_CROSS(Fr,Thr,1,Ic) RETURN Ic3
+  443 Ic = Ic-1/(1+(Fr[Ic-1]-Av)/(Av-Fr[Ic]))
+  444 Thr = Av
+  450 CALL P_CROSS(Fr,Thr,1,Ic3) RETURN Ic2
+  451 Ic2 = Ic2-1/(1+(Fr[Ic2-1]-Av)/(Av-Fr[Ic2]))
+  460 Par[Rn,3] = 13.09/(Ic2-Ic)
+  461 Par[Rn,4] = 0
+  462 Par[Rn,5] = 1
+  463 Par[Rn,6] = N
+  470 Sh = Par[Rn,2]-Ic
+  480 FOR I = 1 TO Par[Rn,1]
+  490   J = I-1
+  500   V2 = R[Rn,I]
+  520   IF J>=1 THEN 539
+  530   V1 = (R[Rn,1]+R[Rn,2]+R[Rn,3])/3
+  535   GOTO 540
+  539   V1 = R[Rn,J]
+  540   Fr[I] = V2-Sh*(V2-V1)
+  550 NEXT I
+  560 FOR I = 1 TO Par[Rn,1]
+  570   R[Rn,I] = Fr[I]
+  580 NEXT I
+  590 GOTO 23
+  600 STOP
+  610 IF Command$<>"bas" THEN 760
+  620 Av1 = 0
+  630 Av2 = 0
+  640 FOR I = 1 TO Nav
+  650   Av1 = Av1+R[Rn,I]
+  660   Av2 = Av2+R[Rn,Par[Rn,1]-I+1]
+  670 NEXT I
+  680 Av1 = Av1/Nav
+  690 Av2 = Av2/Nav
+  700 Dif = (Av2-Av1)/Par[Rn,1]
+  710 FOR I = 1 TO Par[Rn,1]
+  720   R[Rn,I] = R[Rn,I]-Av1-I*Dif
+  730 NEXT I
+  740 GOTO 23
+  750 STOP
+  760 REM  Double integration
+  770 IF Command$<>"fin" THEN 970
+  780 REM Finding frontier points of the spectrum
+  790 S1 = 0
+  800 S2 = 0
+  810 FOR I = 1 TO Nav
+  820   S1 = S1+R[Rn,I]+R[Rn,Par[Rn,1]-I+1]
+  830   S2 = S2+R[Rn,I]*R[Rn,I]+R[Rn,Par[Rn,1]-I+1]*R[Rn,Par[Rn,1]-I+1]
+  840 NEXT I
+  850 Av = S1/2/Nav
+  860 Delta = SQR((S2-2*Nav*Av*Av)/2/Nav)
+  870 Thr = 2.5*Delta
+  880 FOR I = 1 TO Par[Rn,1]
+  890   Fr[I] = R[Rn,I]
+  900 NEXT I
+  910 CALL P_CROSS(Fr,Thr) RETURN N1
+  920 Thr = -Thr
+  930 CALL P_CROSS(Fr,Thr,1,-Par[Rn,1]) RETURN N2
+  940 Par[Rn,5] = N1
+  950 Par[Rn,6] = N2
+  960 GOTO 23
+  970 IF Command$<>"int" THEN 1270
+  980 DIM Aux[Par[Rn,1]]
+  990 H = 0
+ 1000 FOR I = 1 TO Par[Rn,1]
+ 1010   H = H+R[Rn,I]
+ 1020   Aux[I] = H
+ 1030 NEXT I
+ 1040 CALL P_MAX(Aux,H,Nh)
+ 1050 K = 0
+ 1060 Lsum1 = 0
+ 1070 Lsum2 = 0
+ 1080 FOR I = Nh TO Par[Rn,5] STEP -1
+ 1090   Lsum1 = Lsum1+R[Rn,I]
+ 1100   Lsum2 = Lsum2+R[Rn,I]*K
+ 1110   K = K+1
+ 1120 NEXT I
+ 1130 K = 0
+ 1140 Rsum1 = 0
+ 1150 Rsum2 = 0
+ 1160 FOR I = Nh TO Par[Rn,6]
+ 1170   Rsum1 = Rsum1-R[Rn,I]
+ 1180   Rsum2 = Rsum2+R[Rn,I]*K
+ 1190   K = K+1
+ 1200 NEXT I
+ 1210 Ss = (Lsum2-Rsum2)*Par[Rn,3]^2
+ 1220 HOME
+ 1230 PRINT "DOUBLE INTEGRAL = ";Ss
+ 1240 PRINT "LEFT AND RIGHT FIRST INTEGRALS = ";Lsum1,Rsum1
+ 1250 Par[Rn,4] = Ss
+ 1260 GOTO 23
+ 1270 IF Command$<>"plo" THEN 1750
+ 1280 DIM Yes$(1)
+ 1290 INPUT PROMPT "RESET SCREEN? ":Yes$
+ 1300 IF Yes$<>"y" THEN 1320
+ 1310 SET GRAPH DEVICE
+ 1320 SET LINE COLOR Rn
+ 1330 GOSUB 1370
+ 1340 GOSUB 1470
+ 1350 DRAW PICTURE Border WITH B
+ 1360 GOTO 23
+ 1370 DIM B[3,3],C[3,3]
+ 1380 HOME
+ 1390 Sc = Scr[4]/13.09*Par[Rn,3]
+ 1400 Sh = Scr[3]-Par[Rn,2]*Sc
+ 1410 B = SCALE(Sc,Scr[5])
+ 1420 C = SHIFT(Sh,0)
+ 1430 B = B MPY C
+ 1440 SET WINDOW 1,Scr[1],-Scr[2],Scr[2]
+ 1450 SET VIEWPORT 0,130,0,100
+ 1460 GOTO 1500
+ 1470 AXIS Scr[1],Scr[2]/5,1,0
+ 1480 AXIS Scr[1],Scr[2]/5,Scr[1],0
+ 1490 RETURN
+ 1500 MOVE Scr[3],0
+ 1510 GOSUB 1570
+ 1520 MOVE Scr[3]+Scr[4],0
+ 1530 GOSUB 1570
+ 1540 MOVE Scr[3]+2*Scr[4],0
+ 1550 GOSUB 1570
+ 1560 GOTO 1610
+ 1570 RMOVE 0,Scr[2]/40
+ 1580 RDRAW 0,-Scr[2]/20
+ 1590 PRINT
+ 1600 RETURN
+ 1610 DRAW PICTURE Spectr WITH B
+ 1620 RETURN
+ 1630 STOP
+ 1640 PICTURE Spectr
+ 1650   FOR I = 1 TO Par[Rn,1]
+ 1660     PLOT I,R[Rn,I];
+ 1670   NEXT I
+ 1680 END PICTURE
+ 1690 PICTURE Border
+ 1700   MOVE Par[Rn,5],80
+ 1710   PLOT Par[Rn,5],80;Par[Rn,5],20
+ 1720   MOVE Par[Rn,6],80
+ 1730   PLOT Par[Rn,6],80;Par[Rn,6],20
+ 1740 END PICTURE
+ 1750 IF Command$<>"sav" THEN 1900
+ 1760 GOSUB 1780
+ 1770 GOTO 23
+ 1780 INPUT PROMPT " ENTER SPECTRUM FILE NAME(<=8 char) TO STORE => ":Name$
+ 1790 IF Name$="0" THEN 1890
+ 1800 PRINT "ENTER <= 60 CHAR. SPECTRUM NAME; FIRST 5 CHAR. NONBLANK."
+ 1810 PRINT
+ 1820 INPUT Comment$
+ 1830 OPEN #1,Par[Rn,1]+100:Name$,"W"
+ 1840 WRITE #1:Comment$,Par[Rn,1],Par[Rn,2],Par[Rn,3],Par[Rn,4]
+ 1850 FOR I = 1 TO Par[Rn,1]
+ 1860   WRITE #1:R[Rn,I]
+ 1870 NEXT I
+ 1880 CLOSE
+ 1890 RETURN
+ 1900 IF Command$<>"reg" THEN 1940
+ 1920 INPUT PROMPT "NEW REGISTER => ":Rn
+ 1930 GOTO 23
+ 1940 IF Command$<>"loa" THEN 2050
+ 1950 INPUT PROMPT "ENTER FILE NAME => ":Name$
+ 1960 OPEN #1:Name$,"R"
+ 1970 READ #1:Comment$,Par[Rn,1],Par[Rn,2],Par[Rn,3],Par[Rn,4]
+ 1980 PRINT Comment$,Par[Rn,1],Par[Rn,2],Par[Rn,3],Par[Rn,4]
+ 1990 FOR I = 1 TO Par[Rn,1]
+ 2000   READ #1:R[Rn,I]
+ 2010 NEXT I
+ 2020 Par[Rn,5] = 1
+ 2030 Par[Rn,6] = Par[Rn,1]
+ 2040 GOTO 23
+ 2050 IF Command$<>"ref" THEN 2090
+ 2060 Par[Rn,5] = 1
+ 2070 Par[Rn,6] = Par[Rn,1]
+ 2080 GOTO 23
+ 2090 IF Command$<>"sca" THEN 2120
+ 2100 INPUT PROMPT "ENTER NEW SCALING FACTOR = ":Scr[5]
+ 2110 GOTO 23
+ 2120 IF Command$<>"sub" THEN 2550
+ 2130 INPUT PROMPT "REGISTER FOR INITIAL SPECTRUM: ":Ri
+ 2140 INPUT PROMPT "REGISTER FOR THE RESULT: ":Rn
+ 2150 FOR I = 1 TO Par[Ri,1]
+ 2160   R[Rn,I] = R[Ri,I]
+ 2170 NEXT I
+ 2180 FOR I = 1 TO 6
+ 2190   Par[Rn,I] = Par[Ri,I]
+ 2200 NEXT I
+ 2210 Par[Rn,4] = 0
+ 2220 INPUT PROMPT "REGISTER FOR THE SPECTRUM TO BE SUBTRACTED: ":Rs
+ 2230 INPUT PROMPT "WEIGHTING FACTOR: ":W
+ 2240 K = Par[Rn,3]/Par[Rs,3]
+ 2250 FOR L = Par[Rn,2] TO 1 STEP -1
+ 2260   GOSUB 2280
+ 2270   GOTO 2350
+ 2280   Is = Par[Rs,2]-(Par[Rn,2]-L)*K
+ 2290   Ii = INT(Is)
+ 2300   IF Ii<1 THEN 2330
+ 2310   Sb = R[Rs,Ii]+(R[Rs,Ii+1]-R[Rs,Ii])*(Is-Ii)
+ 2320   GOTO 2340
+ 2330   Sb = 0
+ 2340   RETURN
+ 2350   R[Rn,L] = R[Rn,L]+Sb*W
+ 2360 NEXT L
+ 2370 FOR L = Par[Rn,2]+1 TO Par[Rn,1]
+ 2380   GOSUB 2400
+ 2390   GOTO 2470
+ 2400   Is = Par[Rs,2]+(L-Par[Rn,2])*K
+ 2410   Ii = INT(Is)
+ 2420   IF Ii>Par[Rs,1] THEN 2450
+ 2430   Sb = R[Rs,Ii]+(R[Rs,Ii+1]-R[Rs,Ii])*(Is-Ii)
+ 2440   GOTO 2460
+ 2450   Sb = 0
+ 2460   RETURN
+ 2470   R[Rn,L] = R[Rn,L]+Sb*W
+ 2480 NEXT L
+ 2490 GOSUB 1370
+ 2500 INPUT PROMPT "REPEAT SUBTRACTION? (Y OR NO): ":Y$
+ 2510 IF Y$<>"Y" THEN 23
+ 2520 INPUT PROMPT "REPEAT WITH THE SAME SPECTRA? (Y OR NO):":Y$
+ 2530 IF Y$<>"Y" THEN 2220
+ 2540 GOTO 2230
+ 2550 IF Command$<>"exp" THEN 2590
+ 2560 PRINT "CURRENT FREMY PEAK DISTANCE IS ";Scr[4]
+ 2570 INPUT PROMPT "INPUT NEW DISTANCE: ":Scr[4]
+ 2580 GOTO 23
+ 2590 IF Command$<>"hpp" THEN 2670
+ 2600 INPUT PROMPT "SET LINE STYLE NUMBER (0-4): ":Ls
+ 2610 SET GRAPH DEVICE "hpplt"
+ 2620 SET LINE STYLE Ls
+ 2630 GOSUB 1370
+ 2640 SET LINE STYLE 0
+ 2650 SET GRAPH DEVICE
+ 2660 GOTO 23
+ 2670 IF Command$<>"shi" THEN 2710
+ 2680 PRINT "CURRENT FIRST FREMY PEAK POSITION: ";Scr[3]
+ 2690 INPUT PROMPT "NEW POSITION => ":Scr[3]
+ 2700 GOTO 23
+ 2710 IF Command$<>"fit" THEN 3750
+ 2720 INPUT PROMPT "Number of basis spectra=>":N
+ 2730 INPUT PROMPT "NUMBER OF THE FIRST REGISTER USED FOR BASIS SPECTRA:":Nn
+ 2740 Nn = Nn-1
+ 2750 DIM Aa[N,N],B[N],X[N],Xn[N],Xt[N]
+ 2760 INP PRO "First and last point numbers of fragment to be fitted: ":Ni,Nf
+ 2770 INPUT PROMPT "Register for spectrum to be fitted: ":Ri
+ 2800 INPUT PROMPT "Register to place the result: ":Rr
+ 2810 DIM Rt[N,Par[Ri,1]]
+ 2820 FOR I = 1 TO N
+ 2830   K = Par[Ri,3]/Par[I+Nn,3]
+ 2840   Rn = Ri
+ 2850   Rs = I+Nn
+ 2860   FOR L = Par[Ri,2] TO 1 STEP -1
+ 2870     GOSUB 2280
+ 2880     Rt[I,L] = Sb
+ 2890   NEXT L
+ 2900   FOR L = Par[Ri,2]+1 TO Par[Ri,1]
+ 2910     GOSUB 2400
+ 2920     Rt[I,L] = Sb
+ 2930   NEXT L
+ 2940 NEXT I
+ 2950 FOR I = 1 TO N
+ 2960   FOR J = 1 TO N
+ 2970     Aa[I,J] = 0
+ 2980     FOR L = Ni TO Nf
+ 2990       Aa[I,J] = Aa[I,J]+Rt[J,L]*Rt[I,L]
+ 3000     NEXT L
+ 3010   NEXT J
+ 3020 NEXT I
+ 3030 FOR I = 1 TO N
+ 3040   B[I] = 0
+ 3050   FOR L = Ni TO Nf
+ 3060     B[I] = B[I]+R[Ri,L]*Rt[I,L]
+ 3070   NEXT L
+ 3080 NEXT I
+ 3090 FOR K = 1 TO N
+ 3100   Xn[K] = K
+ 3110 NEXT K
+ 3120 FOR K = 1 TO N-1
+ 3130   GOSUB 3310
+ 3140   FOR I = K+1 TO N
+ 3150     W = Aa[I,K]/Aa[K,K]
+ 3160     B[I] = B[I]-B[K]*W
+ 3170     FOR J = K TO N
+ 3180       Aa[I,J] = Aa[I,J]-Aa[K,J]*W
+ 3190     NEXT J
+ 3200   NEXT I
+ 3210 NEXT K
+ 3220 X[N] = B[N]/Aa[N,N]
+ 3230 FOR K = N-1 TO 1 STEP -1
+ 3240   FOR J = K+1 TO N
+ 3250     B[K] = B[K]-Aa[K,J]*X[J]
+ 3260   NEXT J
+ 3270   X[K] = B[K]/Aa[K,K]
+ 3280 NEXT K
+ 3290 GOSUB 3470
+ 3300 GOTO 3540
+ 3310 Ww = 0
+ 3320 FOR J = K TO N
+ 3330   IF ABS(Aa[K,J])<Ww THEN 3360
+ 3340   Ww = ABS(Aa[K,J])
+ 3350   Jm = J
+ 3360 NEXT J
+ 3370 IF Jm=K THEN RETURN
+ 3380 FOR I = 1 TO N
+ 3390   Et = Aa[I,K]
+ 3400   Aa[I,K] = Aa[I,Jm]
+ 3410   Aa[I,Jm] = Et
+ 3420 NEXT I
+ 3430 Et = Xn[K]
+ 3440 Xn[K] = Xn[Jm]
+ 3450 Xn[Jm] = Et
+ 3460 RETURN
+ 3470 FOR I = 1 TO N
+ 3480   J = Xn[I]
+ 3490   Xt[J] = X[I]
+ 3500 NEXT I
+ 3510 X = Xt
+ 3520 RETURN
+ 3530 STOP
+ 3540 FOR J = 1 TO Par[Ri,1]
+ 3550   R[Rr,J] = 0
+ 3560   FOR I = 1 TO N
+ 3570     R[Rr,J] = R[Rr,J]+X[I]*Rt[I,J]
+ 3580   NEXT I
+ 3590 NEXT J
+ 3600 Rs = 0
+ 3610 FOR J = 1 TO Par[Ri,1]
+ 3620   Rs = Rs+(R[Ri,J]-R[Rr,J])^2
+ 3630 NEXT J
+ 3640 FOR I = 1 TO N
+ 3650   PRINT "FUNCTION ";I;"    WEIGHT :";X[I];"  INTERGRAL ";X[I]*Par[I+Nn,4]
+ 3660 NEXT I
+ 3670 PRINT "Residual sum of squares= ";SQR(Rs)
+ 3680 FOR I = 1 TO 3
+ 3690   Par[Rr,I] = Par[Ri,I]
+ 3700 NEXT I
+ 3710 Par[Rr,5] = 1
+ 3720 Par[Rr,6] = Par[Rr,1]
+ 3730 Rn = Rr
+ 3740 GOTO 23
+ 3750 IF Command$<>"old" THEN 3970
+ 3760 INPUT PROMPT "ENTER FILENAME: ":Name$
+ 3770 OPEN #2,1100:Name$,"R"
+ 3780 READ #2:Comment$,Par[Rn,2],Par[Rn,3],Par[Rn,4]
+ 3790 PRINT Comment$,Par[Rn,2],Par[Rn,3],Par[Rn,4]
+ 3800 DIM Rrr[1000]
+ 3810 FOR K = 1 TO 1000
+ 3820   READ #2:Rrr[K]
+ 3830 NEXT K
+ 3840 CLOSE #2
+ 3850 CALL P_MAX(Rrr,Pm,Im)
+ 3860 CALL P_MIN(Rrr,Pl,Im)
+ 3870 Norm = 1000/(Pm-Pl)
+ 3880 FOR I = 1 TO 1000
+ 3890   R[Rn,I] = Rrr[I]*Norm
+ 3900 NEXT I
+ 3910 Par[Rn,1] = 1000
+ 3920 Par[Rn,5] = 1
+ 3930 Par[Rn,6] = 1000
+ 3940 Par[Rn,3] = 13.09/(Par[Rn,3]-Par[Rn,2])
+ 3950 Par[Rn,4] = Par[Rn,4]*Norm
+ 3960 GOTO 23
+ 3970 IF Command$<>"imp" THEN 4400
+ 3980 INPUT PROMPT "ENTER FILENAME:":Name$
+ 3990 DIM Ht[3000],Rt[3000]
+ 3991 FOR I = 1 TO 3000
+ 3992   Rt[I] = 0
+ 3993 NEXT I
+ 4000 OPEN #1,80:Name$,"r"
+ 4010 FOR I = 1 TO 3000
+ 4020   ON EOF(1) GOTO 4080
+ 4030   INPUT #1 USING 4050:Ht[I],Rt[I]
+ 4040   OFF EOF(1)
+ 4050   IMAGE 2(16E)
+ 4060 NEXT I
+ 4070 CLOSE #1
+ 4080 I = I-1
+ 4090 Par[Rn,1] = I
+ 4100 Par[Rn,3] = (Ht[I]-Ht[1])/I
+ 4110 Par[Rn,5] = 1
+ 4120 Par[Rn,6] = I
+ 4130 V = 0
+ 4140 CALL P_MAX(Rt,V,J)
+ 4150 Vmax = V
+ 4160 CALL P_MIN(Rt,V,J)
+ 4170 Nor = Vmax
+ 4180 IF Vmax>=ABS(V) THEN 4200
+ 4190 Nor = ABS(V)
+ 4200 FOR K = 1 TO I
+ 4210   R[Rn,K] = Rt[K]/Nor*500
+ 4220 NEXT K
+ 4230 CALL P_CROSS(Ht,0) RETURN J
+ 4240 Jc = J-1-Ht[J-1]/(Ht[J]-Ht[J-1])
+ 4250 Jf = Jc-13.09/Par[Rn,3]
+ 4255 Par[Rn,2] = INT(Jf)+1
+ 4260 Sh = INT(Jf)+1-Jf
+ 4270 FOR I = 1 TO Par[Rn,1]
+ 4280   J = I-1
+ 4290   V2 = R[Rn,I]
+ 4300   IF J>=1 THEN 4330
+ 4310   V1 = 0
+ 4320   GOTO 4340
+ 4330   V1 = R[Rn,J]
+ 4340   Rt[I] = V2-Sh*(V2-V1)
+ 4350 NEXT I
+ 4360 FOR I = 1 TO Par[Rn,1]
+ 4370   R[Rn,I] = Rt[I]
+ 4380 NEXT I
+ 4390 GOTO 23
+ 4400 IF Command$<>"cop" THEN 4540
+ 4410 INPUT PROMPT "SPECIFY DESTINATION REGISTER: ":Rd
+ 4420 INPUT PROMPT "SPECIFY THE BOUNDARY POINTS OF THE FRAGMENT: ":Lp,Lr
+ 4430 IF Lr<Par[Rn,1] THEN Par[Rd,1] = Lr-Lp+1 ELSE Par[Rd,1] = Par[Rn,1]-Lp+1
+ 4440 Par[Rd,2] = Par[Rn,2]-Lp+1
+ 4450 Par[Rd,3] = Par[Rn,3]
+ 4460 Par[Rd,4] = 0.0
+ 4470 Par[Rd,5] = 1
+ 4480 Par[Rd,6] = Par[Rd,1]
+ 4490 FOR I = Lp TO Lr
+ 4500   IF I<Par[Rn,1] THEN R[Rd,I-Lp+1] = R[Rn,I] ELSE EXIT
+ 4510 NEXT I
+ 4520 Rn = Rd
+ 4530 GOTO 23
+ 4540 IF Command$<>"sho" THEN 4700
+ 4545 INPUT PROMPT "SPECIFY NUMBER OF THE POINT TO BE SHOWN: ":Np
+ 4550 HOME
+ 4560 Sc = Scr[4]/13.09*Par[Rn,3]
+ 4570 Sh = Scr[3]-Par[Rn,2]*Sc
+ 4580 B = SCALE(Sc,Scr[5])
+ 4590 C = SHIFT(Sh,0)
+ 4600 B = B MPY C
+ 4605 SET LINE COLOR 11
+ 4610 DRAW PICTURE Arrow WITH B
+ 4620 GOTO 23
+ 4630 PICTURE Arrow
+ 4640   PLOT Np,2;Np-4,15;Np+4,15;Np,2
+ 4650 END PICTURE
+ 4700 IF Command$<>"mou" THEN 5000
+ 4710 SET GRAPH INPUT DEVICE "MMOUSE"
+ 4720 INPUT POINT ON
+ 4730 PRINT AT 1,1:"Press G or A to proceed or Q to quit"
+ 4735 INPUT KEY WAIT K$
+ 4736 PRINT AT 1,1:"                                    "
+ 4740 IF K$<>"G" OR K$<>"g" THEN 4800
+ 4745 PRINT AT 1,1:"Pick the point"
+ 4750 Href = 0.71448*9350/2.0056
+ 4760 Nref = Scr[3]+Scr[4]
+ 4770 INPUT POINT X,Y
+ 4775 Hx = Href+13.09*(X-Nref)/Scr[4]
+ 4780 G = 0.71448*9350/Hx
+ 4790 PRINT AT 1,60 USING "3A,1D.5D":"g= ";G
+ 4795 GOTO 4730
+ 4800 IF K$<>"a" OR K$<>"A" THEN 4900
+ 4810 PRINT AT 1,1:"Pick  the first point"
+ 4820 INPUT POINT X1,Y1
+ 4830 PRINT AT 1,1:"Pick the second point"
+ 4840 INPUT POINT X2,Y2
+ 4850 PRINT AT 1,40 USING "3A,4D.3D,2A":"A= ";ABS(13.09*(X2-X1)/Scr[4]);" G"
+ 4860 GOTO 4730
+ 4900 IF K$<>"q" OR K$<>"Q" THEN 4730
+ 4910 INPUT POINT OFF
+ 4920 GOTO 23
+ 5000 IF Command$<>"mov" THEN 5060
+ 5010 INPUT PROMPT "Enter vertical shift value =>":Vsh
+ 5020 FOR I = 1 TO Par[Rn,1]
+ 5030   R[Rn,I] = R[Rn,I]+Vsh
+ 5040 NEXT I
+ 5050 GOTO 23
+ 5060 GOTO 23
