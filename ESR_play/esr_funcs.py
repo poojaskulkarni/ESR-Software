@@ -9,7 +9,7 @@ def baseline(in_reg):
 def find(in_reg):
     n_left = 0
     n_right = len(in_reg)
-    return n1, n2
+    return n_left, n_right
 
 
 # Integrate: ten buttons, saves integrate() output (pooja) to same register struct
