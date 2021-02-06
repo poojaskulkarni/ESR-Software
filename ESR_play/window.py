@@ -1,11 +1,12 @@
 import tkinter as tk
 from tkinter import *
 from tkinter.filedialog import askopenfilename
+from tkinter.filedialog import asksaveasfilename
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import esr_funcs
-
+import numpy
 
 global df
 global par
@@ -49,7 +50,25 @@ def import_txt_data(reg_num):
     df[reg_num] = pd.read_csv(txt_file_path, names=[
         'ESR Values'], skiprows=4, skipfooter=16).to_numpy()
 
-    print(df[reg_num])
+    # print(df[reg_num])
+    replot()
+
+
+def save_reg(reg_num):
+    global reg_string
+
+    files = [('All Files', '*.*'),
+             ('Text Document', '*.txt')]
+
+    txt_file_path = asksaveasfilename(filetypes=files, defaultextension=files)
+
+    reg_string[reg_num].set(txt_file_path)
+    global df
+    A = numpy.array([1, 2, 3, 4])
+    B = numpy.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6])
+    savearray = numpy.append(A, numpy.append(df[reg_num], B))
+    numpy.savetxt(txt_file_path, savearray, delimiter=', ')
+
     replot()
 
 
@@ -102,7 +121,7 @@ for i in range(10):
 label0 = tk.Label(text="Register 0:")
 label0.grid(row=0, column=0)
 entry0 = tk.Entry(window, textvariable=reg_string[0]).grid(
-    row=0, column=1, columnspan=5)
+    row=0, column=1)
 tk.Button(window, text='Browse Data Set',
           command=lambda: import_txt_data(0)).grid(row=1, column=0)
 tk.Checkbutton(window, text='Graph',
@@ -116,7 +135,8 @@ tk.Button(window, text='Refind',
 tk.Button(window, text='Integrate',
           command=lambda: integrateButton(0)).grid(row=1, column=5)
 tk.Label(window, text='Double Integral:').grid(row=1, column=6)
-
+tk.Button(window, text='Save', command=lambda: save_reg(0)
+          ).grid(row=0, column=3)
 
 label1 = tk.Label(text="Register 1:")
 label1.grid(row=2, column=0)
